@@ -11,8 +11,8 @@ export default function Home() {
           Find local businesses, track your outreach, and automate your sales process.
         </p>
       </div>
-
       <Search />
     </main>
   );
 }
+
