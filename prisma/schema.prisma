@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Business {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  name     String
+  category String
+  location String
+  phone    String?
+  website  String?
+  email    String?
+  isScraped Boolean  @default(false)
+  addedAt  DateTime @default(now())
+  leads    Lead[]
+  emailLinks EmailBusinessLink[]
+}
+
+model Lead {
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
+  businessId String     @db.ObjectId
+  business   Business   @relation(fields: [businessId], references: [id])
+  status     LeadStatus @default(NEW)
+  emailSent  Boolean    @default(false)
+  notes      String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  REPLIED
+  CLOSED
+}
+
+/// Email extracted and normalized; globally unique across all businesses
+model Email {
+  id            String       @id @default(auto()) @map("_id") @db.ObjectId
+  address       String       @unique
+  status        EmailStatus  @default(NEW)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  lastOpenedAt  DateTime?
+  lastClickedAt DateTime?
+  unsubscribeAt DateTime?
+
+  sources       EmailSource[]
+  links         EmailBusinessLink[]
+  mailLogs      MailLog[]
+}
+
+/// Provenance of an email discovery for auditability
+model EmailSource {
+  id         String       @id @default(auto()) @map("_id") @db.ObjectId
+  emailId    String       @db.ObjectId
+  email      Email        @relation(fields: [emailId], references: [id])
+  url        String
+  method     String       // e.g., "mailto", "text", "pattern"
+  confidence Int          // 0-100
+  createdAt  DateTime     @default(now())
+}
+
+/// Many-to-many link between Business and Email
+model EmailBusinessLink {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  businessId  String   @db.ObjectId
+  emailId     String   @db.ObjectId
+  business    Business @relation(fields: [businessId], references: [id])
+  email       Email    @relation(fields: [emailId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([businessId, emailId])
+}
+
+/// Log of outbound emails and engagement
+model MailLog {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  emailId     String      @db.ObjectId
+  email       Email       @relation(fields: [emailId], references: [id])
+  subject     String
+  body        String
+  status      MailStatus  @default(DRAFT)
+  sentAt      DateTime?
+  openedAt    DateTime?
+  clickedAt   DateTime?
+  bounceReason String?
+  meta        Json?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+enum EmailStatus {
+  NEW
+  VERIFIED
+  INVALID
+  BOUNCED
+  UNSUBSCRIBED
+}
+
+enum MailStatus {
+  DRAFT
+  SENT
+  OPENED
+  CLICKED
+  BOUNCED
+  ERROR
+}

@@ -1,24 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Clientify - Lead Generation App
 
-## Getting Started
+A Next.js application for finding businesses, tracking leads, and sending outreach emails.
 
-First, run the development server:
+## Features
 
+- 🔍 Search for businesses by category and location using SerpAPI
+- 📊 Track leads with status management (NEW, CONTACTED, REPLIED, CLOSED)
+- 📧 Send automated outreach emails to businesses
+- 💾 Store business and lead data in MongoDB
+- 🎨 Modern UI with Tailwind CSS
+
+## Setup
+
+1. **Install dependencies:**
+```bash
+npm install
+# or
+pnpm install
+```
+
+2. **Set up environment variables:**
+Create a `.env.local` file in the root directory with:
+```env
+# Database
+DATABASE_URL="mongodb://localhost:27017/clientify"
+
+# SerpAPI for business search
+SERPAPI_BASE_URL="https://serpapi.com/search"
+SERPAPI_KEY="your_serpapi_key_here"
+
+# Email configuration (Gmail)
+MAIL_USER="your_email@gmail.com"
+MAIL_PASS="your_app_password_here"
+```
+
+3. **Set up MongoDB:**
+- Install MongoDB locally or use MongoDB Atlas
+- Update the DATABASE_URL in your .env.local file
+
+4. **Get SerpAPI key:**
+- Sign up at [SerpAPI](https://serpapi.com/)
+- Get your API key and add it to .env.local
+
+5. **Set up Gmail for emails:**
+- Enable 2-factor authentication on your Gmail account
+- Generate an app password
+- Use your Gmail address and app password in .env.local
+
+6. **Initialize the database:**
+```bash
+npx prisma generate
+npx prisma db push
+```
+
+7. **Run the development server:**
 ```bash
 npm run dev
 # or
-yarn dev
-# or
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000) to see the application.
 
 ## Learn More
 
