@@ -110,6 +110,27 @@ export default function LeadsPage() {
     }
   };
 
+  const removeLead = async (leadId: string) => {
+    if (!confirm('Are you sure you want to delete this lead? This action cannot be undone.')) return;
+    
+    try {
+      const res = await fetch(`/api/leads/${leadId}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to delete lead');
+      }
+
+      // Refresh leads
+      await fetchLeads();
+      alert('Lead deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      alert('Failed to delete lead. Please try again.');
+    }
+  };
+
   const sendEmail = async (lead: Lead) => {
     if (!lead.business.email) {
       alert('Cannot send email: No email address available for this business');
@@ -445,6 +466,13 @@ export default function LeadsPage() {
                     Email Sent
                   </span>
                 )}
+
+                <button
+                  onClick={() => removeLead(lead.id)}
+                  className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
+                >
+                  🗑️ Delete Lead
+                </button>
               </div>
 
               {/* Quick action: scrape emails for this business */}

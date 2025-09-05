@@ -1,19 +1,50 @@
 "use client";
-import React, { useState } from "react";
-
-interface BusinessResult {
-  title: string;
-  address: string;
-  phone?: string;
-  website?: string;
-  email?: string;
-  type?: string;
-}
+import React, { useState, useEffect } from "react";
+import { BusinessResult, Lead } from "@/types";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 function Results({ loading, results }: { loading: boolean; results: BusinessResult[] }) {
   const [addingToLeads, setAddingToLeads] = useState<{ [key: number]: boolean }>({});
   const [selectedBusinesses, setSelectedBusinesses] = useState<Set<number>>(new Set());
   const [bulkAdding, setBulkAdding] = useState(false);
+  const [existingLeads, setExistingLeads] = useState<Set<string>>(new Set());
+  const [filteredResults, setFilteredResults] = useState<BusinessResult[]>([]);
+  const [showHidden, setShowHidden] = useState(false);
+
+  // Fetch existing leads to check which businesses are already added
+  useEffect(() => {
+    const fetchExistingLeads = async () => {
+      try {
+        const response = await fetch('/api/leads');
+        if (response.ok) {
+          const leads: Lead[] = await response.json();
+          const businessNames = new Set(
+            leads.map(lead => lead.business.name.toLowerCase().trim())
+          );
+          setExistingLeads(businessNames);
+        }
+      } catch (error) {
+        console.error('Error fetching existing leads:', error);
+      }
+    };
+
+    fetchExistingLeads();
+  }, []);
+
+  // Filter results based on existing leads
+  useEffect(() => {
+    if (results.length === 0) {
+      setFilteredResults([]);
+      return;
+    }
+
+    const filtered = results.filter(business => {
+      const businessName = business.title.toLowerCase().trim();
+      return !existingLeads.has(businessName);
+    });
+
+    setFilteredResults(filtered);
+  }, [results, existingLeads]);
 
   const addToLeads = async (business: BusinessResult, index: number) => {
     setAddingToLeads(prev => ({ ...prev, [index]: true }));
@@ -57,6 +88,16 @@ function Results({ loading, results }: { loading: boolean; results: BusinessResu
       }
 
       alert('Business added to leads successfully!');
+      
+      // Refresh existing leads list
+      const leadsResponse = await fetch('/api/leads');
+      if (leadsResponse.ok) {
+        const leads: Lead[] = await leadsResponse.json();
+        const businessNames = new Set(
+          leads.map(lead => lead.business.name.toLowerCase().trim())
+        );
+        setExistingLeads(businessNames);
+      }
     } catch (error) {
       console.error('Error adding to leads:', error);
       alert('Failed to add business to leads. Please try again.');
@@ -98,7 +139,7 @@ function Results({ loading, results }: { loading: boolean; results: BusinessResu
     try {
       for (const index of selectedBusinesses) {
         try {
-          const business = results[index];
+          const business = filteredResults[index];
           
           // Save business to database
           const businessResponse = await fetch('/api/businesses', {
@@ -147,6 +188,16 @@ function Results({ loading, results }: { loading: boolean; results: BusinessResu
       if (successCount > 0) {
         alert(`Successfully added ${successCount} businesses to leads${errorCount > 0 ? ` (${errorCount} failed)` : ''}!`);
         clearSelection();
+        
+        // Refresh existing leads list
+        const leadsResponse = await fetch('/api/leads');
+        if (leadsResponse.ok) {
+          const leads: Lead[] = await leadsResponse.json();
+          const businessNames = new Set(
+            leads.map(lead => lead.business.name.toLowerCase().trim())
+          );
+          setExistingLeads(businessNames);
+        }
       } else {
         alert('Failed to add any businesses to leads. Please try again.');
       }
@@ -161,8 +212,7 @@ function Results({ loading, results }: { loading: boolean; results: BusinessResu
   if (loading) {
     return (
       <div className="mt-8 text-center">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <p className="mt-2 text-gray-400">Searching for businesses...</p>
+        <LoadingSpinner size="lg" text="Searching for businesses..." />
       </div>
     );
   }
@@ -174,13 +224,33 @@ function Results({ loading, results }: { loading: boolean; results: BusinessResu
       </div>
     );
   }
-  console.log(results);
+
+  const hiddenCount = results.length - filteredResults.length;
+  const displayResults = showHidden ? results : filteredResults;
+
   return (
     <div className="mt-4">
       <div className="mb-3 flex justify-between items-center">
-        <h2 className="text-lg font-semibold text-gray-200">Found {results.length} businesses</h2>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-200">
+            Found {displayResults.length} businesses
+            {hiddenCount > 0 && !showHidden && (
+              <span className="text-sm text-gray-400 ml-2">
+                ({hiddenCount} already in leads)
+              </span>
+            )}
+          </h2>
+          {hiddenCount > 0 && (
+            <button
+              onClick={() => setShowHidden(!showHidden)}
+              className="text-sm text-blue-400 hover:text-blue-300 mt-1"
+            >
+              {showHidden ? 'Hide already added businesses' : 'Show all businesses'}
+            </button>
+          )}
+        </div>
         
-        {results.length > 0 && (
+        {displayResults.length > 0 && (
           <div className="flex items-center gap-2">
             <button
               onClick={selectAllBusinesses}
@@ -215,10 +285,12 @@ function Results({ loading, results }: { loading: boolean; results: BusinessResu
       </div>
       
       <div className="space-y-3">
-        {results.map((business, index) => (
-          <div key={index} className={`bg-gray-800 border rounded-lg p-4 hover:shadow-md transition-shadow ${
-            selectedBusinesses.has(index) ? 'border-blue-500 bg-gray-750' : 'border-gray-700'
-          }`}>
+        {displayResults.map((business, index) => {
+          const isAlreadyAdded = existingLeads.has(business.title.toLowerCase().trim());
+          return (
+            <div key={index} className={`bg-gray-800 border rounded-lg p-4 hover:shadow-md transition-shadow ${
+              selectedBusinesses.has(index) ? 'border-blue-500 bg-gray-750' : 'border-gray-700'
+            } ${isAlreadyAdded ? 'opacity-60' : ''}`}>
             <div className="flex items-start gap-3">
               {/* Checkbox */}
               <input
@@ -289,24 +361,32 @@ function Results({ loading, results }: { loading: boolean; results: BusinessResu
               </div>
               
               <div className="ml-3">
-                <button
-                  onClick={() => addToLeads(business, index)}
-                  disabled={addingToLeads[index]}
-                  className="bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700 disabled:opacity-50 transition-colors"
-                >
-                  {addingToLeads[index] ? (
-                    <div className="flex items-center">
-                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
-                      Adding
-                    </div>
-                  ) : (
-                    "Add to Leads"
-                  )}
-                </button>
+                {isAlreadyAdded ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-400 text-sm">✓ Already in Leads</span>
+                    <span className="text-xs text-gray-500">({business.title})</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => addToLeads(business, index)}
+                    disabled={addingToLeads[index]}
+                    className="bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  >
+                    {addingToLeads[index] ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                        Adding
+                      </div>
+                    ) : (
+                      "Add to Leads"
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

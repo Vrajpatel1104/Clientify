@@ -2,7 +2,7 @@ import dns from "dns";
 
 export async function hasValidMx(domain: string): Promise<boolean> {
   try {
-    const records = await new Promise<dns.MxRecord[]>((resolve, reject) => {
+    const records = await new Promise<dns.MxRecord[]>((resolve) => {
       dns.resolveMx(domain, (err, addresses) => {
         if (err) return resolve([]);
         resolve(addresses || []);

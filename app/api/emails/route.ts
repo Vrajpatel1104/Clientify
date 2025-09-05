@@ -18,12 +18,12 @@ export async function GET() {
       businessId: b.id,
       businessName: b.name,
       website: b.website,
-      isScraped: (b as any).isScraped ?? false,
+      isScraped: b.isScraped ?? false,
       leadStatus: b.leads[0]?.status ?? null,
       emails: b.emailLinks.map((l) => ({ id: l.email.id, address: l.email.address, status: l.email.status })),
     }));
     return NextResponse.json(rows);
-  } catch (e) {
+  } catch {
     return NextResponse.json([]);
   }
 }

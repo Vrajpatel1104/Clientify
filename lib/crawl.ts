@@ -11,6 +11,7 @@ const DEFAULT_PATHS = [
   "/contact",
   "/contact-us",
   "/contactus",
+  "/about-us",
   "/about",
   "/team",
   "/support",
@@ -20,36 +21,60 @@ const DEFAULT_PATHS = [
   "/terms",
   "/impressum",
   "/careers",
-  "/jobs"
+  "/jobs",
+  "/kontakt",
+  "/kontact",
+  "/en/contact",
+  "/en/about",
+  "/company",
+  "/who-we-are"
 ];
 
-function normalizeBase(website: string): string {
+function buildBaseVariants(website: string): string[] {
   try {
-    const u = new URL(website.startsWith("http") ? website : `https://${website}`);
-    u.hash = "";
-    u.search = "";
-    return u.origin;
+    const hasProtocol = website.startsWith("http://") || website.startsWith("https://");
+    const initial = new URL(hasProtocol ? website : `https://${website}`);
+    const hostname = initial.hostname.replace(/^www\./i, "");
+    const candidates = [
+      new URL(`${initial.protocol}//${hostname}`),
+      new URL(`${initial.protocol}//www.${hostname}`),
+      new URL(`https://${hostname}`),
+      new URL(`https://www.${hostname}`),
+      new URL(`http://${hostname}`),
+      new URL(`http://www.${hostname}`),
+    ];
+    const normalized = candidates.map((u) => {
+      u.hash = "";
+      u.search = "";
+      return u.origin;
+    });
+    return Array.from(new Set(normalized));
   } catch {
-    return website;
+    return [website];
   }
 }
 
 export async function fetchPages(website: string, extraPaths: string[] = []): Promise<FetchedPage[]> {
-  const origin = normalizeBase(website);
+  const bases = buildBaseVariants(website);
   const paths = Array.from(new Set([...DEFAULT_PATHS, ...extraPaths]));
-  const urls = paths.map((p) => new URL(p, origin).toString());
+  const urls = bases.flatMap((base) => paths.map((p) => new URL(p, base).toString()));
 
-  const results = await Promise.all(
-    urls.map(async (url) => {
+  async function fetchWithRetry(url: string, attempts: number = 2): Promise<FetchedPage> {
+    const headers = { "user-agent": "Mozilla/5.0 (compatible; ClientifyBot/1.0; +https://clientify.local)" } as any;
+    for (let i = 0; i < attempts; i++) {
       try {
-        const res = await fetch(url, { headers: { "user-agent": "ClientifyBot/1.0" } });
+        const res = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
         const html = await res.text();
         return { url, html, status: res.status } as FetchedPage;
       } catch {
-        return { url, html: "", status: 0 } as FetchedPage;
+        if (i === attempts - 1) break;
+        await new Promise((r) => setTimeout(r, 300));
       }
-    })
-  );
+    }
+    return { url, html: "", status: 0 } as FetchedPage;
+  }
+
+  const results = await Promise.all(urls.map((u) => fetchWithRetry(u)));
 
   return results.filter((r) => r.status >= 200 && r.status < 400 && r.html);
 }

@@ -128,12 +128,20 @@ export async function POST(req: Request) {
       }
     }
 
-    // Mark business as scraped regardless of found results to avoid re-scraping
+    // Only mark as scraped if we actually found any valid emails
+    let updatedIsScraped = Boolean(results.length > 0);
     try {
-      await prisma.business.update({ where: { id: businessId }, data: { isScraped: true } });
+      if (updatedIsScraped) {
+        const updated = await prisma.business.update({ where: { id: businessId }, data: { isScraped: true } });
+        updatedIsScraped = (updated as any).isScraped ?? updatedIsScraped;
+      } else {
+        // Keep as-is if none found to allow future re-scrapes without force
+        const current = await prisma.business.findUnique({ where: { id: businessId } });
+        updatedIsScraped = Boolean(current?.isScraped);
+      }
     } catch {}
 
-    return NextResponse.json({ count: results.length, results, businessId, isScraped: true });
+    return NextResponse.json({ count: results.length, results, businessId, isScraped: updatedIsScraped });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Failed to scrape emails" }, { status: 500 });

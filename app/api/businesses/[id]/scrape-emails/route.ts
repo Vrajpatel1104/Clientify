@@ -10,7 +10,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       return NextResponse.json({ error: "Business not found or no website" }, { status: 400 });
     }
     const origin = new URL(req.url).origin;
-    const { force } = await (async () => { try { return await req.json(); } catch { return {}; } })() as any;
+    const { force } = await (async () => { try { return await req.json(); } catch { return {}; } })() as { force?: boolean };
     const res = await fetch(`${origin}/api/scrape-emails`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -19,7 +19,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     const data = await res.json();
     const status = res.ok ? 200 : 500;
     return NextResponse.json(data, { status });
-  } catch (e) {
+  } catch {
     return NextResponse.json({ error: "Failed to trigger scrape" }, { status: 500 });
   }
 }

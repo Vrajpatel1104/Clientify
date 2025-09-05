@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { handleApiError, validateRequiredFields, createValidationErrorResponse, extractSearchParams } from "@/lib/api-utils";
 
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const category = searchParams.get("category");
-    const location = searchParams.get("location");
-
-    console.log('API called with:', { category, location });
-
-    if (!category || !location) {
-      return NextResponse.json({ error: "Missing params" }, { status: 400 });
+    const { params, missingParams } = extractSearchParams(req, ['category', 'location']);
+    
+    if (missingParams.length > 0) {
+      return createValidationErrorResponse(missingParams);
     }
+
+    const { category, location } = params;
 
     // Check if environment variables are set
     if (!process.env.SERPAPI_BASE_URL || !process.env.SERPAPI_KEY) {
@@ -73,22 +72,20 @@ export async function GET(req: Request) {
 
     return NextResponse.json(data.local_results || []);
   } catch (error) {
-    console.error('Error in businesses API:', error);
-    return NextResponse.json({ 
-      error: "Failed to fetch businesses", 
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    return handleApiError(error, 'fetch businesses');
   }
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, category, location, phone, website, email } = body;
-
-    if (!name || !category || !location) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    const { isValid, missingFields } = validateRequiredFields(body, ['name', 'category', 'location']);
+    
+    if (!isValid) {
+      return createValidationErrorResponse(missingFields);
     }
+
+    const { name, category, location, phone, website, email } = body;
 
     // Check if business already exists to avoid duplicates
     const existingBusiness = await prisma.business.findFirst({
@@ -121,10 +118,8 @@ export async function POST(req: Request) {
       }
     });
 
-    console.log('Business created:', business);
     return NextResponse.json(business);
   } catch (error) {
-    console.error('Error creating business:', error);
-    return NextResponse.json({ error: "Failed to create business" }, { status: 500 });
+    return handleApiError(error, 'create business');
   }
 }
